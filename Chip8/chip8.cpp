@@ -61,6 +61,61 @@ class Chip8 {
 
             // Initialize RNG
 		    randByte = std::uniform_int_distribution<uint8_t>(0, 255U);
+
+            // Set up opcode hash map
+            table[0x0] = &Table0;
+            table[0x1] = &op_1nnn;
+            table[0x2] = &op_2nnn;
+            table[0x3] = &op_3xkk;
+            table[0x4] = &op_4xkk;
+            table[0x5] = &op_5xy0;
+            table[0x6] = &op_6xkk;
+            table[0x7] = &op_7xkk;
+            table[0x8] = &Table8;
+            table[0x9] = &op_9xy0;
+            table[0xA] = &op_Annn;
+            table[0xB] = &op_Bnnn;
+            table[0xC] = &op_Cxkk;
+            table[0xD] = &op_Dxyn;
+            table[0xE] = &TableE;
+            table[0xF] = &TableF;
+
+            // Not all spots in table0, tableE, and tableF will be mapped to actual operations, so fill in everything with nops first so that an accidental index won't break anything
+            // All spots in table 8 have a function mapped to them, however, so we don't need to fill in nops for that
+            for (uint8_t i = 0; i <= 0xEu; i++) {
+                table0[i] = &nop;
+                tableE[i] = &nop;
+            }
+
+            for (uint8_t i = 0; i <= 0x65u; i++) {
+                tableF[i] = &nop;
+            }
+
+            table0[0x0] = &op_00E0;
+            table0[0xE] = &op_00EE;
+
+            table8[0x0] = &op_8xy0;
+            table8[0x1] = &op_8xy1;
+            table8[0x2] = &op_8xy2;
+            table8[0x3] = &op_8xy3;
+            table8[0x4] = &op_8xy4;
+            table8[0x5] = &op_8xy5;
+            table8[0x6] = &op_8xy6;
+            table8[0x7] = &op_8xy7;
+            table8[0xE] = &op_8xyE;
+
+            tableE[0x1] = &op_ExA1;
+            tableE[0xE] = &op_Ex9E;
+
+            tableF[0x07] = &op_Fx07;
+            tableF[0x0A] = &op_Fx0A;
+            tableF[0x15] = &op_Fx15;
+            tableF[0x18] = &op_Fx18;
+            tableF[0x1E] = &op_Fx1E;
+            tableF[0x29] = &op_Fx29;
+            tableF[0x33] = &op_Fx33;
+            tableF[0x55] = &op_Fx55;
+            tableF[0x65] = &op_Fx65;    
         }
         
         void load_rom(const char* filename) {
@@ -92,6 +147,17 @@ class Chip8 {
         std::default_random_engine randGen;
         std::uniform_int_distribution<uint8_t> randByte;
         uint8_t fav_key = -1; // Used for op_Fx0A()
+
+        // Creates type for function in Chip8 so that I can use it to make function table
+        typedef void (Chip8::*cpu_instr)();
+
+        // Create opcode hash table
+        // One main table, plus subtables for opcodes that have multiple instructions that start with a certain hex digit
+        cpu_instr table[0xF + 1];
+        cpu_instr table0[0xE + 1];
+        cpu_instr table8[0xE + 1];
+        cpu_instr tableE[0xE + 1];
+        cpu_instr tableF[0x65 + 1];
 
         // Helper function to get Vx, Vy, and kk since I do that a lot
         uint8_t* get_Vx_other(bool need_kk) {
@@ -375,4 +441,24 @@ class Chip8 {
                 registers[i] = memory[index + i];
             }
         }
+
+        // When instruction starts with relevant hex digit, call one of these functions to call the correct function within the subtable
+        void Table0() {
+            ((*this).*(table0[opcode & 0x000Fu]))();
+        }
+
+        void Table8() {
+            ((*this).*(table8[opcode & 0x000Fu]))();
+        }
+
+        void TableE() {
+            ((*this).*(tableE[opcode & 0x000Fu]))();
+        }
+
+        void TableF() {
+            ((*this).*(tableF[opcode & 0x000FFu]))(); // Instruction chosen for this table depends on last two hex digitd
+        }
+
+        // NOP instruction used to fill in holes in opcode hash table
+        void nop() {}
 };
