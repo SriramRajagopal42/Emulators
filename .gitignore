@@ -1,4 +1,4 @@
-Chip8/*
-!Chip8/chip8.cpp
-!Chip8/README.md
+Chip8/SDL3.dll
+Chip8/CMakeLists.txt
+Chip8/build/*
 !Chip8/build/chip8.exe
