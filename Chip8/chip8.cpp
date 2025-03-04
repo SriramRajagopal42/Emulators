@@ -1,7 +1,10 @@
 #include <cstdint>
 #include <fstream>
 #include <chrono>
+#include <string>
 #include <random>
+#include "SDL.h"
+#include <iostream>
 
 const unsigned int NUM_REGISTERS = 16;
 const unsigned int MEM_SIZE = 4096;
@@ -35,7 +38,244 @@ uint8_t fontset[FONTSET_SIZE] =
 	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
+class Platform
+{
+public:
+	Platform(char const* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight)
+	{
+		SDL_Init(SDL_INIT_VIDEO);
+
+		SDL_CreateWindowAndRenderer(title, windowWidth, windowHeight, 0, &window, &renderer);
+
+		texture = SDL_CreateTexture(
+			renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight);
+	}
+
+	~Platform()
+	{
+		SDL_DestroyTexture(texture);
+		SDL_DestroyRenderer(renderer);
+		SDL_DestroyWindow(window);
+		SDL_Quit();
+	}
+
+	void Update(void const* buffer, int pitch)
+	{
+		SDL_UpdateTexture(texture, nullptr, buffer, pitch);
+		SDL_RenderClear(renderer);
+		SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+		SDL_RenderPresent(renderer);
+	}
+
+	bool ProcessInput(uint8_t* keys)
+	{
+		bool quit = false;
+
+		SDL_Event event;
+
+		while (SDL_PollEvent(&event))
+		{
+			switch (event.type)
+			{
+				case SDL_EVENT_QUIT:
+				{
+					quit = true;
+				} break;
+
+				case SDL_EVENT_KEY_DOWN:
+				{
+					switch (event.key.key)
+					{
+						case SDLK_ESCAPE:
+						{
+							quit = true;
+						} break;
+
+						case SDLK_X:
+						{
+							keys[0] = 1;
+						} break;
+
+						case SDLK_1:
+						{
+							keys[1] = 1;
+						} break;
+
+						case SDLK_2:
+						{
+							keys[2] = 1;
+						} break;
+
+						case SDLK_3:
+						{
+							keys[3] = 1;
+						} break;
+
+						case SDLK_Q:
+						{
+							keys[4] = 1;
+						} break;
+
+						case SDLK_W:
+						{
+							keys[5] = 1;
+						} break;
+
+						case SDLK_E:
+						{
+							keys[6] = 1;
+						} break;
+
+						case SDLK_A:
+						{
+							keys[7] = 1;
+						} break;
+
+						case SDLK_S:
+						{
+							keys[8] = 1;
+						} break;
+
+						case SDLK_D:
+						{
+							keys[9] = 1;
+						} break;
+
+						case SDLK_Z:
+						{
+							keys[0xA] = 1;
+						} break;
+
+						case SDLK_C:
+						{
+							keys[0xB] = 1;
+						} break;
+
+						case SDLK_4:
+						{
+							keys[0xC] = 1;
+						} break;
+
+						case SDLK_R:
+						{
+							keys[0xD] = 1;
+						} break;
+
+						case SDLK_F:
+						{
+							keys[0xE] = 1;
+						} break;
+
+						case SDLK_V:
+						{
+							keys[0xF] = 1;
+						} break;
+					}
+				} break;
+
+				case SDL_EVENT_KEY_UP:
+				{
+					switch (event.key.key)
+					{
+						case SDLK_X:
+						{
+							keys[0] = 0;
+						} break;
+
+						case SDLK_1:
+						{
+							keys[1] = 0;
+						} break;
+
+						case SDLK_2:
+						{
+							keys[2] = 0;
+						} break;
+
+						case SDLK_3:
+						{
+							keys[3] = 0;
+						} break;
+
+						case SDLK_Q:
+						{
+							keys[4] = 0;
+						} break;
+
+						case SDLK_W:
+						{
+							keys[5] = 0;
+						} break;
+
+						case SDLK_E:
+						{
+							keys[6] = 0;
+						} break;
+
+						case SDLK_A:
+						{
+							keys[7] = 0;
+						} break;
+
+						case SDLK_S:
+						{
+							keys[8] = 0;
+						} break;
+
+						case SDLK_D:
+						{
+							keys[9] = 0;
+						} break;
+
+						case SDLK_Z:
+						{
+							keys[0xA] = 0;
+						} break;
+
+						case SDLK_C:
+						{
+							keys[0xB] = 0;
+						} break;
+
+						case SDLK_4:
+						{
+							keys[0xC] = 0;
+						} break;
+
+						case SDLK_R:
+						{
+							keys[0xD] = 0;
+						} break;
+
+						case SDLK_F:
+						{
+							keys[0xE] = 0;
+						} break;
+
+						case SDLK_V:
+						{
+							keys[0xF] = 0;
+						} break;
+					}
+				} break;
+			}
+		}
+
+		return quit;
+	}
+
+private:
+	SDL_Window* window{};
+	SDL_Renderer* renderer{};
+	SDL_Texture* texture{};
+};
+
 class Chip8 {
+    #define Vx ((opcode & 0x0F00u) >> 8u)
+    #define Vy ((opcode & 0x00F0u) >> 4u)
+    #define nnn (opcode & 0x0FFFu)
+    #define kk (opcode & 0x00FFu)
+
     public:
         uint8_t registers[NUM_REGISTERS]{}; // 16 8-bit registers
         uint8_t memory[MEM_SIZE]{}; // 4KB of memory
@@ -117,6 +357,26 @@ class Chip8 {
             tableF[0x55] = &op_Fx55;
             tableF[0x65] = &op_Fx65;    
         }
+
+        void cycle() {
+            // Fetch next two bytes in memory, since one instruction is two bytes
+            opcode = (memory[pc] << 8u) | memory[pc + 1];
+
+            // Set program counter to point to next instruction
+            pc += 2;
+
+            // Use function hashmap to find correct function to use, using the first hex digit as the hash function
+            ((*this).*(table[opcode >> 12u]))(); // Right shift here is logical since opcode is unsigned, so no worry about MSB bleeding over into rest of the number
+
+            // Decrement timers every cycle
+            if (delay_timer) {
+                delay_timer--;
+            }
+
+            if (sound_timer) {
+                sound_timer--;
+            }
+        }
         
         void load_rom(const char* filename) {
             // Open the file as a stream of binary and move the file pointer to the end
@@ -140,7 +400,6 @@ class Chip8 {
                 // Free the buffer
                 delete[] buffer;
             }
-
         }
 
     private:
@@ -159,22 +418,6 @@ class Chip8 {
         cpu_instr tableE[0xE + 1];
         cpu_instr tableF[0x65 + 1];
 
-        // Helper function to get Vx, Vy, and kk since I do that a lot
-        uint8_t* get_Vx_other(bool need_kk) {
-            // Returns an array with Vx as well as either Vy or kk
-            uint8_t arr[2]{};
-
-            arr[0] = (opcode & 0x0F00u) >> 8u; // Vx
-
-            if (need_kk) {
-                arr[1] = (opcode & 0x00FFu); // kk
-            } else {
-                arr[1] = (opcode & 0x00F0u) >> 4u; // Vy
-            }
-
-            return arr;
-        }
-
         void op_00E0() {
             // Clear the display
             for (int i = 0; i < DISPLAY_WIDTH * DISPLAY_HEIGHT; ++i) {
@@ -190,136 +433,119 @@ class Chip8 {
 
         void op_1nnn() {
             // Jump to location nnn
-            pc = (opcode & 0x0FFFu);
+            pc = nnn;
         }
 
         void op_2nnn() {
             // Call subroutine at nnn
             sp++;
             stack[sp] = pc;
-            pc = (opcode & 0x0FFFu);
+            pc = nnn;
         }
 
         void op_3xkk() {
             // Skip next instruction if Vx == kk
-            uint8_t* arr = get_Vx_other(true);
-            pc += 2 * (registers[arr[0]] == arr[1]);
+            pc += 2 * (registers[Vx] == kk);
         }
 
         void op_4xkk() {
             // Skip next instruction if Vx != kk
-            uint8_t* arr = get_Vx_other(true);
-            pc += 2 * (registers[arr[0]] != arr[1]);
+            pc += 2 * (registers[Vx] != kk);
         }
 
         void op_5xy0() {
             // Skip next instruction if Vx == Vy
-            uint8_t* arr = get_Vx_other(false);
-            pc += 2 * (registers[arr[0]] == registers[arr[1]]);
+            pc += 2 * (registers[Vx] == registers[Vy]);
         }
 
         void op_6xkk() {
             // Set Vx = kk
-            uint8_t* arr = get_Vx_other(true);
-            registers[arr[0]] = arr[1];
+            registers[Vx] = kk;
         }
 
         void op_7xkk() {
             // Set Vx = Vx + kk
-            uint8_t* arr = get_Vx_other(true);
-            registers[arr[0]] += arr[1];
+            registers[Vx] += kk;
         }
 
         void op_8xy0() {
             // Set Vx = Vy
-            uint8_t* arr = get_Vx_other(false);
-            registers[arr[0]] = registers[arr[1]];
+            registers[Vx] = registers[Vy];
         }
 
         void op_8xy1() {
             // Set Vx OR Vy
-            uint8_t* arr = get_Vx_other(false);
-            registers[arr[0]] |= registers[arr[1]];
+            registers[Vx] |= registers[Vy];
         }
 
         void op_8xy2() {
             // Set Vx AND Vy
-            uint8_t* arr = get_Vx_other(false);
-            registers[arr[0]] &= registers[arr[1]];
+            registers[Vx] &= registers[Vy];
         }
 
         void op_8xy3() {
             // Set Vx XOR Vy
-            uint8_t* arr = get_Vx_other(false);
-            registers[arr[0]] ^= registers[arr[1]];
+            registers[Vx] ^= registers[Vy];
         }
 
         void op_8xy4() {
             // Set Vx = Vx + Vy, set VF = carry
-            uint8_t* arr = get_Vx_other(false);
-            uint16_t sum = registers[arr[0]] + registers[arr[1]]; // Do it like this because we need to cast to 16 bits since we are checking for overflow
+            uint16_t sum = registers[Vx] + registers[Vy]; // Do it like this because we need to cast to 16 bits since we are checking for overflow
             registers[0xFu] = (sum > 255u); // Set VF true if overflow
-            registers[arr[0]] = (sum & 0xFFu); // Gets bottom 8 bits of sum and stores in Vx
+            registers[Vx] = (sum & 0xFFu); // Gets bottom 8 bits of sum and stores in Vx
         }
 
         void op_8xy5() {
             // Set Vx = Vx - Vy, set VF = NOT borrow
-            uint8_t* arr = get_Vx_other(false);
-            registers[0xFu] = (registers[arr[0] > registers[arr[1]]]);
-            registers[arr[0]] -= registers[arr[1]];
+            registers[0xFu] = (registers[Vx] > registers[Vy]);
+            registers[Vx] -= registers[Vy];
         }
 
         void op_8xy6() {
             // Set Vx = Vx SHR 1
-            int8_t Vx = (opcode & 0x0F00u) >> 8u;
             registers[0xFu] = registers[Vx] & 0x1u;
             registers[Vx] >>= 1;
         }
 
         void op_8xy7() {
             // Set Vx = Vy - Vx, set VF = NOT borrow
-            uint8_t* arr = get_Vx_other(false);
-            registers[0xFu] = (registers[arr[1] > registers[arr[0]]]);
-            registers[arr[0]] = registers[arr[1]] - registers[arr[0]];
+            registers[0xFu] = (registers[Vy] > registers[Vx]);
+            registers[Vx] = registers[Vy] - registers[Vx];
         }
 
         void op_8xyE() {
             // Set Vx = Vx SHL 1
-            int8_t Vx = (opcode & 0x0F00u) >> 8u;
             registers[0xFu] = (registers[Vx] & 0x80u) >> 7u;
             registers[Vx] <<= 1;
         }
 
         void op_9xy0() {
             // Skip next instruction if Vx != Vy
-            uint8_t* arr = get_Vx_other(false);
-            pc += 2 * (registers[arr[0]] != registers[arr[1]]);
+            pc += 2 * (registers[Vx] != registers[Vy]);
         }
 
         void op_Annn() {
             // Set I = nnn
-            index = opcode & 0x0FFFu;
+            index = opcode & nnn;
         }
 
         void op_Bnnn() {
             // Jump to location nnn + V0
-            pc = (opcode & 0x0FFFu) + registers[0];
+            pc = nnn + registers[0];
         }
 
         void op_Cxkk() {
             // Set Vx = random byte AND kk
-            uint8_t* arr = get_Vx_other(true);
-            registers[arr[0]] = randByte(randGen) & arr[1];
+            registers[Vx] = randByte(randGen) & kk;
         }
 
         void op_Dxyn() {
             // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision
-            uint8_t* arr = get_Vx_other(false);
             uint8_t n = opcode & 0x000Fu;
 
             // Get top left coords + wrap
-            uint8_t x_coord = registers[arr[0]] % DISPLAY_WIDTH;
-            uint8_t y_coord = registers[arr[1]] % DISPLAY_HEIGHT;
+            uint8_t x_coord = registers[Vx] % DISPLAY_WIDTH;
+            uint8_t y_coord = registers[Vy] % DISPLAY_HEIGHT;
 
             // Set default value of collision detector to 0
             registers[0xFu] = 0;
@@ -348,26 +574,22 @@ class Chip8 {
 
         void op_Ex9E() {
             // Skip next instruction if key with the value of Vx is pressed
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             pc += 2 * (keypad[registers[Vx]]);
         }
 
         void op_ExA1() {
             // Skip next instruction if key with the value of Vx is not pressed
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             pc += 2 * (!keypad[registers[Vx]]);
         }
 
         void op_Fx07() {
             // Set Vx = delay timer value
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             registers[Vx] = delay_timer;
         }
 
         // https://retrocomputing.stackexchange.com/questions/358/how-are-held-down-keys-handled-in-chip-8
         void op_Fx0A() {
             // Wait for a key press, store the value of the key in Vx
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
 
             // If key is held down, value is stored in fav_key until it is lifted, and only then is the key stored in Vx
             // Did this with while loop before, but that stops timers from ticking
@@ -380,34 +602,29 @@ class Chip8 {
                 for (uint8_t i = 0; i < NUM_KEYS; i++) {
                     if (keypad[i]) {
                         fav_key = i;
+                        break;
                     }
                 }
-
-                pc -= 2;
             }
         }
 
         void op_Fx15() {
             // Set delay timer = Vx
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             delay_timer = registers[Vx];
         }
 
         void op_Fx18() {
             // Set sound timer = Vx
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             sound_timer = registers[Vx];
         }
 
         void op_Fx1E() {
             // Set I = I + Vx
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             index += registers[Vx];
         }
 
         void op_Fx29() {
             // Set I = location of sprite for digit Vx
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             index = FONTSET_START_ADDRESS + (5 * registers[Vx]); // Each digit is 5 bytes long, so multiply desired digit by 5 to get correct byte offset
         }
 
@@ -415,7 +632,6 @@ class Chip8 {
             // Store BCD representation of Vx in memory locations I, I + 1, and I + 2
             
             // So 158 would have 1 at I, 5 at I + 1, and 8 at I + 3
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             uint8_t val = registers[Vx]; // Actually creating a new variable since I will be modifying this, and don't want to modify registers[Vx]
             
             // Ex: Start with 158
@@ -428,7 +644,6 @@ class Chip8 {
 
         void op_Fx55() {
             // Store registers V0 through Vx in memory starting at location I
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             for (uint8_t i = 0; i <= Vx; i++) {
                 memory[index + i] = registers[i];
             }
@@ -436,7 +651,6 @@ class Chip8 {
 
         void op_Fx65() {
             // Read registers V0 through Vx from memory starting at location I
-            uint8_t Vx = (opcode & 0x0F00u) >> 8u;
             for (uint8_t i = 0; i <= Vx; i++) {
                 registers[i] = memory[index + i];
             }
@@ -462,3 +676,45 @@ class Chip8 {
         // NOP instruction used to fill in holes in opcode hash table
         void nop() {}
 };
+
+int main(int argc, char** argv) {
+    if (argc != 4)
+	{
+		std::cerr << "Usage: " << argv[0] << " <Scale> <Delay> <ROM>\n";
+		std::exit(EXIT_FAILURE);
+	}
+
+    int videoScale = std::stoi(argv[1]);
+	int cycleDelay = std::stoi(argv[2]);
+	char const* romFilename = argv[3];
+
+	Platform platform("CHIP-8 Emulator", DISPLAY_WIDTH * videoScale, DISPLAY_HEIGHT * videoScale, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+	Chip8 chip8;
+	chip8.load_rom(romFilename);
+
+	int videoPitch = sizeof(chip8.display[0]) * DISPLAY_WIDTH;
+
+	auto lastCycleTime = std::chrono::high_resolution_clock::now();
+	bool quit = false;
+
+	while (!quit)
+	{
+		quit = platform.ProcessInput(chip8.keypad);
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
+
+		if (dt > cycleDelay)
+		{
+			lastCycleTime = currentTime;
+
+			chip8.cycle();
+
+			platform.Update(chip8.display, videoPitch);
+		}
+	}
+
+	return 0;
+
+}
