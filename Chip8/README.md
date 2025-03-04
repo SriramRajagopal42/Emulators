@@ -2,7 +2,7 @@ Chip8 Emulator
 
 To use: 
 
-Step 1: download the chip8.exe file in the build folder
+Step 1: download the chip8.exe file in the build folder \
 Step 2: ./chip8.exe (size of window) (cycle speed) (.ch8 file of ROM)
 
 Improvements: \
