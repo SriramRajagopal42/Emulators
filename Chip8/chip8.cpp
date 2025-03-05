@@ -43,12 +43,13 @@ class Platform
 public:
 	Platform(char const* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight)
 	{
-		SDL_Init(SDL_INIT_VIDEO);
-
+        SDL_Init(SDL_INIT_VIDEO);
 		SDL_CreateWindowAndRenderer(title, windowWidth, windowHeight, 0, &window, &renderer);
 
 		texture = SDL_CreateTexture(
 			renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight);
+        
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 	}
 
 	~Platform()
