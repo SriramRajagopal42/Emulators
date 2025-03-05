@@ -321,10 +321,10 @@ class Chip8 {
             table[0xE] = &TableE;
             table[0xF] = &TableF;
 
-            // Not all spots in table0, tableE, and tableF will be mapped to actual operations, so fill in everything with nops first so that an accidental index won't break anything
-            // All spots in table 8 have a function mapped to them, however, so we don't need to fill in nops for that
+            // Not all spots in table0, tableE, table8, and tableF will be mapped to actual operations, so fill in everything with nops first so that an accidental index won't break anything
             for (uint8_t i = 0; i <= 0xEu; i++) {
                 table0[i] = &nop;
+                table8[i] = &nop;
                 tableE[i] = &nop;
             }
 
@@ -588,24 +588,20 @@ class Chip8 {
             registers[Vx] = delay_timer;
         }
 
-        // https://retrocomputing.stackexchange.com/questions/358/how-are-held-down-keys-handled-in-chip-8
         void op_Fx0A() {
             // Wait for a key press, store the value of the key in Vx
-
-            // If key is held down, value is stored in fav_key until it is lifted, and only then is the key stored in Vx
-            // Did this with while loop before, but that stops timers from ticking
-            if (fav_key != -1 && !keypad[fav_key]) {
-                registers[Vx] = fav_key;
-                fav_key = -1;
-            }
-            else { // If no key has been lifted
-                // Find value of key that is down
-                for (uint8_t i = 0; i < NUM_KEYS; i++) {
-                    if (keypad[i]) {
-                        fav_key = i;
-                        break;
-                    }
+            bool keyPressed = false;
+        
+            for (uint8_t i = 0; i < NUM_KEYS; i++) {
+                if (keypad[i]) {
+                    registers[Vx] = i;  // Store the key value in Vx
+                    keyPressed = true;
+                    break;
                 }
+            }
+        
+            if (!keyPressed) {
+                pc -= 2;  // Re-execute this instruction until a key is pressed
             }
         }
 
